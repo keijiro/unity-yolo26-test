@@ -1,8 +1,8 @@
 using System;
 using System.Collections;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.UIElements;
@@ -25,8 +25,6 @@ public sealed class DepthDemoController : MonoBehaviour
     Texture2D _depthTexture;
     Material _preprocessMaterial;
     Material _visualizeMaterial;
-    byte[] _readbackData;
-    float[] _depthData;
     bool _readbackPending;
     bool _disposed;
     int _inputWidth;
@@ -256,7 +254,7 @@ public sealed class DepthDemoController : MonoBehaviour
         AsyncGPUReadback.Request(_inputTexture, 0, TextureFormat.RGBA32, OnReadback);
     }
 
-    void OnReadback(AsyncGPUReadbackRequest request)
+    unsafe void OnReadback(AsyncGPUReadbackRequest request)
     {
         _readbackPending = false;
         if (_disposed || _plugin == IntPtr.Zero || request.hasError)
@@ -266,29 +264,18 @@ public sealed class DepthDemoController : MonoBehaviour
         }
 
         var source = request.GetData<byte>();
-        if (_readbackData == null || _readbackData.Length != source.Length)
-            _readbackData = new byte[source.Length];
-        source.CopyTo(_readbackData);
-
-        var pin = GCHandle.Alloc(_readbackData, GCHandleType.Pinned);
-        try
-        {
-            var result = YOLODepthNative.YOLODepthSubmitRGBA(
-                _plugin,
-                pin.AddrOfPinnedObject(),
-                _inputWidth,
-                _inputHeight,
-                _inputWidth * 4
-            );
-            if (result < 0) SetStatus("Could not submit the camera frame.");
-        }
-        finally
-        {
-            pin.Free();
-        }
+        var pointer = (IntPtr)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(source);
+        var result = YOLODepthNative.YOLODepthSubmitRGBA(
+            _plugin,
+            pointer,
+            _inputWidth,
+            _inputHeight,
+            _inputWidth * 4
+        );
+        if (result < 0) SetStatus("Could not submit the camera frame.");
     }
 
-    void ReceiveDepth()
+    unsafe void ReceiveDepth()
     {
         var result = YOLODepthNative.TryGetOutputInfo(
             _plugin,
@@ -304,25 +291,15 @@ public sealed class DepthDemoController : MonoBehaviour
         }
         if (result == 0) return;
 
-        var count = width * height;
-        if (_depthData == null || _depthData.Length != count)
-            _depthData = new float[count];
-        var pin = GCHandle.Alloc(_depthData, GCHandleType.Pinned);
-        try
+        EnsureOutputTextures(width, height);
+        var pixels = _depthTexture.GetRawTextureData<float>();
+        var pointer = (IntPtr)NativeArrayUnsafeUtility.GetUnsafePtr(pixels);
+        if (YOLODepthNative.YOLODepthCopyOutput(_plugin, pointer, pixels.Length) != 1)
         {
-            if (YOLODepthNative.YOLODepthCopyOutput(_plugin, pin.AddrOfPinnedObject(), count) != 1)
-            {
-                SetStatus("Could not copy the depth output.");
-                return;
-            }
-        }
-        finally
-        {
-            pin.Free();
+            SetStatus("Could not copy the depth output.");
+            return;
         }
 
-        EnsureOutputTextures(width, height);
-        _depthTexture.SetPixelData(_depthData, 0);
         _depthTexture.Apply(false, false);
         RenderDepth();
         SetStatus($"Running · {milliseconds:F1} ms inference · {width} × {height} depth");
