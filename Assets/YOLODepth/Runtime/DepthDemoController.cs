@@ -10,7 +10,7 @@ using UnityEngine.UIElements;
 namespace YOLODepth
 {
 
-[RequireComponent(typeof(UIDocument))]
+[RequireComponent(typeof(PanelRenderer))]
 public sealed class DepthDemoController : MonoBehaviour
 {
     const float MinimumLimit = 0.1f;
@@ -31,9 +31,12 @@ public sealed class DepthDemoController : MonoBehaviour
     bool _disposed;
     int _inputWidth;
     int _inputHeight;
+    int _uiVersion = -1;
     float _minimumDepth = 0.3f;
     float _maximumDepth = 2;
+    string _statusMessage;
 
+    PanelRenderer _panelRenderer;
     Image _cameraImage;
     Image _depthImage;
     Label _statusLabel;
@@ -45,15 +48,17 @@ public sealed class DepthDemoController : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Initialize()
     {
-        var document = FindFirstObjectByType<UIDocument>();
-        if (document != null && document.GetComponent<DepthDemoController>() == null)
-            document.gameObject.AddComponent<DepthDemoController>();
+        var renderer = FindAnyObjectByType<PanelRenderer>();
+        if (renderer != null && renderer.GetComponent<DepthDemoController>() == null)
+            renderer.gameObject.AddComponent<DepthDemoController>();
     }
 
     void OnEnable()
     {
         _disposed = false;
-        BindUI();
+        _uiVersion = -1;
+        _panelRenderer = GetComponent<PanelRenderer>();
+        _panelRenderer.RegisterUIReloadCallback(OnUIReload);
         CreateMaterials();
         StartCoroutine(StartCamera());
 
@@ -78,6 +83,9 @@ public sealed class DepthDemoController : MonoBehaviour
     {
         _disposed = true;
         StopAllCoroutines();
+        if (_panelRenderer != null)
+            _panelRenderer.UnregisterUIReloadCallback(OnUIReload);
+        _panelRenderer = null;
         UnbindUI();
 
         if (_webcam != null) _webcam.Stop();
@@ -108,9 +116,12 @@ public sealed class DepthDemoController : MonoBehaviour
         });
     }
 
-    void BindUI()
+    void OnUIReload(PanelRenderer renderer, VisualElement root, int version)
     {
-        var root = GetComponent<UIDocument>().rootVisualElement;
+        if (root == null || version == _uiVersion) return;
+        _uiVersion = version;
+
+        UnbindUI();
         _cameraImage = root.Q<Image>("cameraImage");
         _depthImage = root.Q<Image>("depthImage");
         _statusLabel = root.Q<Label>("statusLabel");
@@ -121,17 +132,27 @@ public sealed class DepthDemoController : MonoBehaviour
 
         _cameraImage.scaleMode = ScaleMode.ScaleToFit;
         _depthImage.scaleMode = ScaleMode.ScaleToFit;
+        _cameraImage.image = _inputTexture != null ? _inputTexture : _webcam;
+        _depthImage.image = _visualizedTexture;
         ConfigureSlider(_minimumSlider, _minimumDepth);
         ConfigureSlider(_maximumSlider, _maximumDepth);
         _minimumSlider.RegisterValueChangedCallback(OnMinimumChanged);
         _maximumSlider.RegisterValueChangedCallback(OnMaximumChanged);
         UpdateRangeLabels();
+        SetStatus(_statusMessage);
     }
 
     void UnbindUI()
     {
         _minimumSlider?.UnregisterValueChangedCallback(OnMinimumChanged);
         _maximumSlider?.UnregisterValueChangedCallback(OnMaximumChanged);
+        _cameraImage = null;
+        _depthImage = null;
+        _statusLabel = null;
+        _minimumLabel = null;
+        _maximumLabel = null;
+        _minimumSlider = null;
+        _maximumSlider = null;
     }
 
     static void ConfigureSlider(Slider slider, float value)
@@ -163,7 +184,7 @@ public sealed class DepthDemoController : MonoBehaviour
 
         _webcam = new WebCamTexture(1280, 720, 30);
         _webcam.Play();
-        _cameraImage.image = _webcam;
+        if (_cameraImage != null) _cameraImage.image = _webcam;
     }
 
     void CompleteInitialization()
@@ -212,7 +233,7 @@ public sealed class DepthDemoController : MonoBehaviour
             wrapMode = TextureWrapMode.Clamp
         };
         _inputTexture.Create();
-        _cameraImage.image = _inputTexture;
+        if (_cameraImage != null) _cameraImage.image = _inputTexture;
         SetStatus($"Ready · {_inputWidth} × {_inputHeight} input");
     }
 
@@ -333,7 +354,7 @@ public sealed class DepthDemoController : MonoBehaviour
             wrapMode = TextureWrapMode.Clamp
         };
         _visualizedTexture.Create();
-        _depthImage.image = _visualizedTexture;
+        if (_depthImage != null) _depthImage.image = _visualizedTexture;
     }
 
     void RenderDepth()
@@ -343,7 +364,7 @@ public sealed class DepthDemoController : MonoBehaviour
         _visualizeMaterial.SetFloat("_MinimumDepth", _minimumDepth);
         _visualizeMaterial.SetFloat("_MaximumDepth", _maximumDepth);
         Graphics.Blit(_depthTexture, _visualizedTexture, _visualizeMaterial);
-        _depthImage.MarkDirtyRepaint();
+        _depthImage?.MarkDirtyRepaint();
     }
 
     void OnMinimumChanged(ChangeEvent<float> evt)
@@ -364,12 +385,13 @@ public sealed class DepthDemoController : MonoBehaviour
 
     void UpdateRangeLabels()
     {
-        _minimumLabel.text = $"{_minimumDepth:F1} m";
-        _maximumLabel.text = $"{_maximumDepth:F1} m";
+        if (_minimumLabel != null) _minimumLabel.text = $"{_minimumDepth:F1} m";
+        if (_maximumLabel != null) _maximumLabel.text = $"{_maximumDepth:F1} m";
     }
 
     void SetStatus(string message)
     {
+        _statusMessage = message;
         if (_statusLabel != null) _statusLabel.text = message;
     }
 
