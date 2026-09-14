@@ -1,0 +1,131 @@
+:root {
+    --background: #0d1117;
+    --panel: #161b22;
+    --panel-border: #30363d;
+    --text: #f0f6fc;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --track: #30363d;
+}
+
+.screen {
+    flex-grow: 1;
+    padding: 24px;
+    background-color: var(--background);
+    color: var(--text);
+}
+
+.header {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+
+.title {
+    font-size: 26px;
+    -unity-font-style: bold;
+}
+
+.subtitle {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.status {
+    color: var(--accent);
+    font-size: 13px;
+    -unity-text-align: middle-right;
+}
+
+.viewports {
+    flex-grow: 1;
+    flex-direction: row;
+}
+
+.viewport-panel {
+    flex-grow: 1;
+    flex-basis: 0;
+    padding: 12px;
+    background-color: var(--panel);
+    border-width: 1px;
+    border-color: var(--panel-border);
+    border-radius: 8px;
+}
+
+.viewport-panel-left {
+    margin-right: 9px;
+}
+
+.viewport-panel-right {
+    margin-left: 9px;
+}
+
+.viewport-title {
+    margin-bottom: 9px;
+    color: var(--muted);
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+.viewport-image {
+    flex-grow: 1;
+    background-color: #000000;
+}
+
+.controls {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 18px;
+    padding: 14px 16px;
+    background-color: var(--panel);
+    border-width: 1px;
+    border-color: var(--panel-border);
+    border-radius: 8px;
+}
+
+.range-title {
+    width: 120px;
+    color: var(--muted);
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+.range-group {
+    flex-grow: 1;
+    flex-direction: row;
+    align-items: center;
+    margin-left: 18px;
+}
+
+.range-slider {
+    flex-grow: 1;
+}
+
+.range-slider > .unity-base-field__label {
+    width: 42px;
+    color: var(--text);
+}
+
+.range-slider .unity-base-slider__tracker {
+    height: 4px;
+    background-color: var(--track);
+    border-width: 0;
+}
+
+.range-slider .unity-base-slider__dragger {
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    background-color: var(--accent);
+    border-width: 0;
+    border-radius: 7px;
+}
+
+.range-value {
+    width: 54px;
+    margin-left: 10px;
+    color: var(--text);
+    -unity-text-align: middle-right;
+}
