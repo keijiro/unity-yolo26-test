@@ -91,8 +91,8 @@ public static class ProjectValidator
     {
         foreach (var path in new[]
                  {
-                     "Assets/Resources/YOLODepth/Preprocess.shader",
-                     "Assets/Resources/YOLODepth/VisualizeDepth.shader"
+                     "Assets/YOLODepth/Shaders/Preprocess.shader",
+                     "Assets/YOLODepth/Shaders/VisualizeDepth.shader"
                  })
         {
             var shader = AssetDatabase.LoadAssetAtPath<Shader>(path);

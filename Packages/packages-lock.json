@@ -138,6 +138,15 @@
         "com.unity.modules.jsonserialize": "1.0.0"
       }
     },
+    "com.unity.visualeffectgraph": {
+      "version": "17.6.0",
+      "depth": 0,
+      "source": "builtin",
+      "dependencies": {
+        "com.unity.shadergraph": "17.6.0",
+        "com.unity.render-pipelines.core": "17.6.0"
+      }
+    },
     "jp.keijiro.klutter-tools": {
       "version": "2.6.0",
       "depth": 0,

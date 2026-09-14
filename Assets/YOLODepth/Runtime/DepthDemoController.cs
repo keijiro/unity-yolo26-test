@@ -11,11 +11,14 @@ namespace YOLODepth
 {
 
 [RequireComponent(typeof(PanelRenderer))]
-public sealed class DepthDemoController : MonoBehaviour
+public sealed class DepthDemoController : TextureSource
 {
     const float MinimumLimit = 0.1f;
     const float MaximumLimit = 10;
     const float MinimumSpan = 0.1f;
+
+    [SerializeField, HideInInspector] Shader _preprocessShader = null;
+    [SerializeField, HideInInspector] Shader _visualizeShader = null;
 
     IntPtr _plugin;
     Task<YOLODepthNative.CreationResult> _creationTask;
@@ -43,18 +46,11 @@ public sealed class DepthDemoController : MonoBehaviour
     Slider _minimumSlider;
     Slider _maximumSlider;
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    static void Initialize()
-    {
-        var renderer = FindAnyObjectByType<PanelRenderer>();
-        if (renderer != null && renderer.GetComponent<DepthDemoController>() == null)
-            renderer.gameObject.AddComponent<DepthDemoController>();
-    }
-
     void OnEnable()
     {
         _disposed = false;
         _uiVersion = -1;
+        PublishTexture(null);
         _panelRenderer = GetComponent<PanelRenderer>();
         _panelRenderer.RegisterUIReloadCallback(OnUIReload);
         CreateMaterials();
@@ -88,6 +84,7 @@ public sealed class DepthDemoController : MonoBehaviour
 
         if (_webcam != null) _webcam.Stop();
         _webcam = null;
+        PublishTexture(null);
         ReleaseTexture(ref _inputTexture);
         ReleaseTexture(ref _visualizedTexture);
         Destroy(_depthTexture);
@@ -162,10 +159,8 @@ public sealed class DepthDemoController : MonoBehaviour
 
     void CreateMaterials()
     {
-        var preprocess = Resources.Load<Shader>("YOLODepth/Preprocess");
-        var visualize = Resources.Load<Shader>("YOLODepth/VisualizeDepth");
-        if (preprocess != null) _preprocessMaterial = new Material(preprocess);
-        if (visualize != null) _visualizeMaterial = new Material(visualize);
+        if (_preprocessShader != null) _preprocessMaterial = new Material(_preprocessShader);
+        if (_visualizeShader != null) _visualizeMaterial = new Material(_visualizeShader);
         if (_preprocessMaterial == null || _visualizeMaterial == null)
             SetStatus("Required shaders could not be loaded.");
     }
@@ -301,6 +296,7 @@ public sealed class DepthDemoController : MonoBehaviour
         }
 
         _depthTexture.Apply(false, false);
+        PublishTexture(_depthTexture);
         RenderDepth();
         SetStatus($"Running · {milliseconds:F1} ms inference · {width} × {height} depth");
     }

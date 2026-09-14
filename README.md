@@ -44,12 +44,17 @@ cool colors are far.
 - `Assets/Plugins/YOLODepth/Native~/YOLODepthPlugin.mm` loads the Core ML model,
   performs inference on a serial background queue, and returns the raw Float32
   depth tensor. It drops frames while inference or output delivery is pending.
-- `Assets/Resources/YOLODepth/Preprocess.shader` performs camera orientation,
+- `Assets/YOLODepth/Shaders/Preprocess.shader` performs camera orientation,
   center cropping, and resizing on the GPU.
-- `Assets/Resources/YOLODepth/VisualizeDepth.shader` maps raw depth values to
+- `Assets/YOLODepth/Shaders/VisualizeDepth.shader` maps raw depth values to
   false colors using the UI-selected range.
 - `Assets/YOLODepth/Runtime/DepthDemoController.cs` coordinates webcam capture,
-  asynchronous GPU readback, native inference, and UI Toolkit.
+  asynchronous GPU readback, native inference, and UI Toolkit. It publishes the
+  current raw depth texture through `TextureSource`.
+- `Assets/YOLODepth/Runtime/VisualEffectTextureBinder.cs` subscribes to a
+  `TextureSource` and assigns it to an exposed Visual Effect texture property.
+  Additional GameObject integrations can use the same source contract without
+  adding target-specific code to the depth controller.
 
 Rebuild the native plug-in after modifying its source:
 
