@@ -303,7 +303,7 @@ public sealed class DepthDemoController : TextureSource
         _depthTexture.Apply(false, false);
         PublishTexture(DepthTextureName, _depthTexture);
         RenderDepth();
-        SetStatus($"Running · {milliseconds:F1} ms inference · {width} × {height} depth");
+        SetStatus($"{milliseconds:F1} ms");
     }
 
     void EnsureOutputTextures(int width, int height)

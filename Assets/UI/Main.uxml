@@ -2,31 +2,34 @@
     <ui:Style src="../YOLODepth/UI/Main.uss" />
     <ui:VisualElement name="root" class="screen">
         <ui:VisualElement class="header">
-            <ui:VisualElement>
-                <ui:Label text="YOLO26 Depth Camera" class="title" />
-                <ui:Label text="Core ML inference · GPU post-processing" class="subtitle" />
-            </ui:VisualElement>
-            <ui:Label name="statusLabel" text="Starting…" class="status" />
+            <ui:Label text="Inference time" class="status-label" />
+            <ui:Label name="statusLabel" class="status" />
         </ui:VisualElement>
         <ui:VisualElement class="viewports">
             <ui:VisualElement class="viewport-panel viewport-panel-left">
-                <ui:Label text="MODEL INPUT · CENTER CROP" class="viewport-title" />
+                <ui:Label text="Model input" class="viewport-title" />
                 <ui:Image name="cameraImage" class="viewport-image" />
             </ui:VisualElement>
             <ui:VisualElement class="viewport-panel viewport-panel-right">
-                <ui:Label text="ESTIMATED DEPTH" class="viewport-title" />
+                <ui:Label text="Estimated depth" class="viewport-title" />
                 <ui:Image name="depthImage" class="viewport-image" />
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement class="controls">
-            <ui:Label text="DISPLAY RANGE" class="range-title" />
+            <ui:Label text="Display range" class="range-title" />
             <ui:VisualElement class="range-group">
-                <ui:Slider name="minimumSlider" label="Near" class="range-slider" />
-                <ui:Label name="minimumValue" class="range-value" />
+                <ui:VisualElement class="range-header">
+                    <ui:Label text="Near" class="range-label" />
+                    <ui:Label name="minimumValue" class="range-value" />
+                </ui:VisualElement>
+                <ui:Slider name="minimumSlider" class="range-slider" />
             </ui:VisualElement>
             <ui:VisualElement class="range-group">
-                <ui:Slider name="maximumSlider" label="Far" class="range-slider" />
-                <ui:Label name="maximumValue" class="range-value" />
+                <ui:VisualElement class="range-header">
+                    <ui:Label text="Far" class="range-label" />
+                    <ui:Label name="maximumValue" class="range-value" />
+                </ui:VisualElement>
+                <ui:Slider name="maximumSlider" class="range-slider" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>
