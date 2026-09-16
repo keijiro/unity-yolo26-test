@@ -144,7 +144,7 @@ PanelRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 231048555}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -195,20 +195,6 @@ PanelRenderer:
   m_PivotReferenceSize: 0
   m_Pivot: 0
   m_Position: 0
---- !u!114 &231048558
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 231048555}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3c3d713e172b345dd99ccd8778cce036, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  _preprocessShader: {fileID: 4800000, guid: a893605a8835f42bcb03057f06bf6899, type: 3}
-  _visualizeShader: {fileID: 4800000, guid: 0262c1a7dffb24d8ab3abcb3023831b4, type: 3}
 --- !u!4 &231048557
 Transform:
   m_ObjectHideFlags: 0
@@ -224,6 +210,20 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &231048558
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 231048555}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c3d713e172b345dd99ccd8778cce036, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _preprocessShader: {fileID: 4800000, guid: a893605a8835f42bcb03057f06bf6899, type: 3}
+  _visualizeShader: {fileID: 4800000, guid: 0262c1a7dffb24d8ab3abcb3023831b4, type: 3}
 --- !u!1 &1207647364
 GameObject:
   m_ObjectHideFlags: 0
@@ -236,6 +236,7 @@ GameObject:
   - component: {fileID: 1207647366}
   - component: {fileID: 1207647365}
   - component: {fileID: 1207647368}
+  - component: {fileID: 1207647369}
   m_Layer: 0
   m_Name: Point Cloud
   m_TagString: Untagged
@@ -328,20 +329,6 @@ VisualEffect:
       m_Array: []
     m_Bool:
       m_Array: []
---- !u!114 &1207647368
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1207647364}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c836d52c641e4ca2bc5f822fd77bf727, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  _source: {fileID: 231048558}
-  _propertyName: DepthTexture
 --- !u!4 &1207647367
 Transform:
   m_ObjectHideFlags: 0
@@ -357,6 +344,34 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1207647368
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1207647364}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c836d52c641e4ca2bc5f822fd77bf727, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _source: {fileID: 231048558}
+  _propertyName: DepthTexture
+--- !u!114 &1207647369
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1207647364}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c836d52c641e4ca2bc5f822fd77bf727, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::YOLODepth.VisualEffectTextureBinder
+  _source: {fileID: 231048558}
+  _propertyName: ColorTexture
 --- !u!1 &1411473415
 GameObject:
   m_ObjectHideFlags: 0
@@ -478,8 +493,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1411473415}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.10452846, y: -0, z: -0, w: 0.9945219}
-  m_LocalPosition: {x: 0, y: 1.5395584, z: -4.890738}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: -5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

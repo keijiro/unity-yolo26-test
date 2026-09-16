@@ -35,7 +35,7 @@ public sealed class VisualEffectTextureBinder : MonoBehaviour
         if (!_applyCurrentTexture) return;
 
         _applyCurrentTexture = false;
-        OnTextureChanged(_source.Texture);
+        ApplyTexture(_source.GetTexture(_propertyName));
     }
 
     void OnDisable()
@@ -45,7 +45,12 @@ public sealed class VisualEffectTextureBinder : MonoBehaviour
         _target = null;
     }
 
-    void OnTextureChanged(Texture texture)
+    void OnTextureChanged(string name, Texture texture)
+    {
+        if (name == _propertyName) ApplyTexture(texture);
+    }
+
+    void ApplyTexture(Texture texture)
     {
         if (_target == null || !texture) return;
         if (_target.HasTexture(_propertyID))

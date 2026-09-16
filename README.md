@@ -50,9 +50,10 @@ cool colors are far.
   false colors using the UI-selected range.
 - `Assets/YOLODepth/Runtime/DepthDemoController.cs` coordinates webcam capture,
   asynchronous GPU readback, native inference, and UI Toolkit. It publishes the
-  current raw depth texture through `TextureSource`.
+  current camera color and raw depth textures through `TextureSource`.
 - `Assets/YOLODepth/Runtime/VisualEffectTextureBinder.cs` subscribes to a
-  `TextureSource` and assigns it to an exposed Visual Effect texture property.
+  named `TextureSource` output and assigns it to the matching exposed Visual
+  Effect texture property.
   Additional GameObject integrations can use the same source contract without
   adding target-specific code to the depth controller.
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace YOLODepth
@@ -6,16 +7,23 @@ namespace YOLODepth
 
 public abstract class TextureSource : MonoBehaviour
 {
-    public Texture Texture { get; private set; }
+    readonly Dictionary<string, Texture> _textures = new();
 
-    public event Action<Texture> TextureChanged;
+    public event Action<string, Texture> TextureChanged;
 
-    protected void PublishTexture(Texture texture)
+    public Texture GetTexture(string name) =>
+        _textures.TryGetValue(name, out var texture) ? texture : null;
+
+    protected void PublishTexture(string name, Texture texture)
     {
-        if (ReferenceEquals(Texture, texture)) return;
+        if (ReferenceEquals(GetTexture(name), texture)) return;
 
-        Texture = texture;
-        TextureChanged?.Invoke(texture);
+        if (texture == null)
+            _textures.Remove(name);
+        else
+            _textures[name] = texture;
+
+        TextureChanged?.Invoke(name, texture);
     }
 }
 

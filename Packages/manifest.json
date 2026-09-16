@@ -5,6 +5,8 @@
     "com.unity.render-pipelines.universal": "17.6.0",
     "com.unity.visualeffectgraph": "17.6.0",
     "jp.keijiro.klutter-tools": "2.6.0",
+    "jp.keijiro.shadergraphassets": "2.5.3",
+    "jp.keijiro.vfxgraphassets": "3.10.1",
     "com.unity.modules.audio": "1.0.0",
     "com.unity.modules.uielements": "1.0.0"
   },

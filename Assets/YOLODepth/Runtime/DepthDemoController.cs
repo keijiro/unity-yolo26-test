@@ -16,6 +16,8 @@ public sealed class DepthDemoController : TextureSource
     const float MinimumLimit = 0.1f;
     const float MaximumLimit = 10;
     const float MinimumSpan = 0.1f;
+    const string DepthTextureName = "DepthTexture";
+    const string ColorTextureName = "ColorTexture";
 
     [SerializeField, HideInInspector] Shader _preprocessShader = null;
     [SerializeField, HideInInspector] Shader _visualizeShader = null;
@@ -50,7 +52,8 @@ public sealed class DepthDemoController : TextureSource
     {
         _disposed = false;
         _uiVersion = -1;
-        PublishTexture(null);
+        PublishTexture(DepthTextureName, null);
+        PublishTexture(ColorTextureName, null);
         _panelRenderer = GetComponent<PanelRenderer>();
         _panelRenderer.RegisterUIReloadCallback(OnUIReload);
         CreateMaterials();
@@ -84,7 +87,8 @@ public sealed class DepthDemoController : TextureSource
 
         if (_webcam != null) _webcam.Stop();
         _webcam = null;
-        PublishTexture(null);
+        PublishTexture(DepthTextureName, null);
+        PublishTexture(ColorTextureName, null);
         ReleaseTexture(ref _inputTexture);
         ReleaseTexture(ref _visualizedTexture);
         Destroy(_depthTexture);
@@ -226,6 +230,7 @@ public sealed class DepthDemoController : TextureSource
             wrapMode = TextureWrapMode.Clamp
         };
         _inputTexture.Create();
+        PublishTexture(ColorTextureName, _inputTexture);
         if (_cameraImage != null) _cameraImage.image = _inputTexture;
         SetStatus($"Ready · {_inputWidth} × {_inputHeight} input");
     }
@@ -296,7 +301,7 @@ public sealed class DepthDemoController : TextureSource
         }
 
         _depthTexture.Apply(false, false);
-        PublishTexture(_depthTexture);
+        PublishTexture(DepthTextureName, _depthTexture);
         RenderDepth();
         SetStatus($"Running · {milliseconds:F1} ms inference · {width} × {height} depth");
     }
