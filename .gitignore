@@ -1,0 +1,35 @@
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+
+/GeneratedAssets
+/Library
+/Logs
+/Recordings
+/Temp
+/UIElementsSchema
+/UserSettings
+
+/.utmp
+/mono_crash.*.json
+/Xcode
+/Web
+
+# Downloadable model data
+/Assets/StreamingAssets/Models/*.mlpackage
+/Assets/StreamingAssets/Models/*.mlpackage.meta
+
+# Generated native plug-ins
+/Assets/Plugins/macOS/*.bundle
+/Assets/Plugins/macOS/*.bundle.meta
+
+/*.app
+/*.exe
+/*.apk
+/*.tgz
+/*_DoNotShip
+
+# Skills
+/skills-lock.json
+/.agents/skills
