@@ -3,8 +3,13 @@
 set -euo pipefail
 
 project_dir="${0:A:h:h}"
-source_file="$project_dir/Assets/Plugins/YOLOSeg/Native~/YOLOSegPlugin.mm"
-plist_file="$project_dir/Assets/Plugins/YOLOSeg/Native~/Info.plist"
+native_dir="$project_dir/Assets/Plugins/YOLOSeg/Native~"
+source_files=(
+    "$native_dir/YOLOSegPlugin.mm"
+    "$native_dir/YOLOSegContext.mm"
+    "$native_dir/YOLOSegPostprocess.mm"
+)
+plist_file="$native_dir/Info.plist"
 bundle_dir="$project_dir/Assets/Plugins/macOS/YOLOSegPlugin.bundle"
 binary_dir="$bundle_dir/Contents/MacOS"
 unity_version=$(sed -n 's/^m_EditorVersion: //p' "$project_dir/ProjectSettings/ProjectVersion.txt")
@@ -31,7 +36,7 @@ xcrun --sdk macosx clang++ \
     -framework CoreML \
     -framework CoreVideo \
     -framework Metal \
-    "$source_file" \
+    "${source_files[@]}" \
     -o "$binary_dir/YOLOSegPlugin"
 
 codesign --force --sign - "$bundle_dir"
