@@ -43,9 +43,9 @@ internal static class YOLOSegNative
     internal static extern int YOLOSegCanSubmit(IntPtr handle);
 
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern int YOLOSegSubmitRGBA(
+    internal static extern int YOLOSegSubmitBGRA(
         IntPtr handle,
-        IntPtr rgba,
+        IntPtr bgra,
         int width,
         int height,
         int rowBytes
@@ -106,7 +106,7 @@ internal static class YOLOSegNative
     internal static int YOLOSegGetInputWidth(IntPtr handle) => 0;
     internal static int YOLOSegGetInputHeight(IntPtr handle) => 0;
     internal static int YOLOSegCanSubmit(IntPtr handle) => 0;
-    internal static int YOLOSegSubmitRGBA(IntPtr handle, IntPtr rgba, int width, int height, int rowBytes) => -1;
+    internal static int YOLOSegSubmitBGRA(IntPtr handle, IntPtr bgra, int width, int height, int rowBytes) => -1;
     internal static int YOLOSegCopyOutput(IntPtr handle, IntPtr destination, int capacity) => -1;
 
     internal static int TryGetOutputInfo(

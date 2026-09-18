@@ -36,6 +36,7 @@ float2 RotateToSource(float2 uv)
 float4 FragPreprocess(float4 position : SV_Position,
                       float2 texCoord : TEXCOORD0) : SV_Target
 {
+    texCoord.y = 1 - texCoord.y;
     float rotation = fmod(_Rotation + 360, 360);
     bool swapDimensions = rotation > 45 && rotation < 315 &&
                           !(rotation > 135 && rotation < 225);

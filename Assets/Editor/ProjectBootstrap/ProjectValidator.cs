@@ -35,9 +35,9 @@ public static class ProjectValidator
     static extern int YOLOSegGetInputHeight(IntPtr handle);
 
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
-    static extern int YOLOSegSubmitRGBA(
+    static extern int YOLOSegSubmitBGRA(
         IntPtr handle,
-        IntPtr rgba,
+        IntPtr bgra,
         int width,
         int height,
         int rowBytes
@@ -128,16 +128,16 @@ public static class ProjectValidator
         for (var x = 0; x < width; x++)
         {
             var index = (y * width + x) * 4;
-            pixels[index + 0] = (byte)(x * 255 / (width - 1));
+            pixels[index + 0] = 128;
             pixels[index + 1] = (byte)(y * 255 / (height - 1));
-            pixels[index + 2] = 128;
+            pixels[index + 2] = (byte)(x * 255 / (width - 1));
             pixels[index + 3] = 255;
         }
 
         var pixelPin = GCHandle.Alloc(pixels, GCHandleType.Pinned);
         try
         {
-            if (YOLOSegSubmitRGBA(handle, pixelPin.AddrOfPinnedObject(), width, height, width * 4) != 1)
+            if (YOLOSegSubmitBGRA(handle, pixelPin.AddrOfPinnedObject(), width, height, width * 4) != 1)
                 throw new InvalidOperationException("The synthetic frame could not be submitted.");
         }
         finally

@@ -71,7 +71,7 @@ NSURL *ResolveModelURL(NSString *path, NSError **error)
     return [MLModel compileModelAtURL:url error:error];
 }
 
-CVPixelBufferRef CreatePixelBuffer(const uint8_t *rgba, int width, int height, int rowBytes)
+CVPixelBufferRef CreatePixelBuffer(const uint8_t *bgra, int width, int height, int rowBytes)
 {
     NSDictionary *attributes = @{
         (id)kCVPixelBufferMetalCompatibilityKey: @YES,
@@ -93,15 +93,9 @@ CVPixelBufferRef CreatePixelBuffer(const uint8_t *rgba, int width, int height, i
     auto destinationRowBytes = CVPixelBufferGetBytesPerRow(buffer);
     for (auto y = 0; y < height; y++)
     {
-        auto sourceRow = rgba + y * rowBytes;
+        auto sourceRow = bgra + y * rowBytes;
         auto destinationRow = destination + y * destinationRowBytes;
-        for (auto x = 0; x < width; x++)
-        {
-            destinationRow[x * 4 + 0] = sourceRow[x * 4 + 2];
-            destinationRow[x * 4 + 1] = sourceRow[x * 4 + 1];
-            destinationRow[x * 4 + 2] = sourceRow[x * 4 + 0];
-            destinationRow[x * 4 + 3] = sourceRow[x * 4 + 3];
-        }
+        std::memcpy(destinationRow, sourceRow, static_cast<size_t>(width * 4));
     }
     CVPixelBufferUnlockBaseAddress(buffer, 0);
     return buffer;
@@ -261,15 +255,20 @@ bool RenderPersonMasks(
     }
 
     output.resize(static_cast<size_t>(pixelCount * 4));
-    for (auto index = 0; index < pixelCount; index++)
+    for (auto y = 0; y < outputHeight; y++)
+    for (auto x = 0; x < outputWidth; x++)
     {
-        auto opacity = static_cast<uint8_t>(
-            std::clamp(alpha[static_cast<size_t>(index)], 0.0f, 1.0f) * 255
+        auto sourceIndex = static_cast<size_t>(y * outputWidth + x);
+        auto destinationIndex = static_cast<size_t>(
+            (outputHeight - 1 - y) * outputWidth + x
         );
-        output[static_cast<size_t>(index * 4 + 0)] = 0;
-        output[static_cast<size_t>(index * 4 + 1)] = opacity;
-        output[static_cast<size_t>(index * 4 + 2)] = opacity;
-        output[static_cast<size_t>(index * 4 + 3)] = 255;
+        auto opacity = static_cast<uint8_t>(
+            std::clamp(alpha[sourceIndex], 0.0f, 1.0f) * 255
+        );
+        output[destinationIndex * 4 + 0] = 0;
+        output[destinationIndex * 4 + 1] = opacity;
+        output[destinationIndex * 4 + 2] = opacity;
+        output[destinationIndex * 4 + 3] = 255;
     }
     return true;
 }
@@ -360,16 +359,16 @@ YS_EXPORT int YOLOSegCanSubmit(void *handle)
     return !context->busy && !context->ready && !context->errorReady;
 }
 
-YS_EXPORT int YOLOSegSubmitRGBA(
+YS_EXPORT int YOLOSegSubmitBGRA(
     void *handle,
-    const uint8_t *rgba,
+    const uint8_t *bgra,
     int width,
     int height,
     int rowBytes
 )
 {
     auto context = static_cast<Context *>(handle);
-    if (context == nullptr || rgba == nullptr) return -1;
+    if (context == nullptr || bgra == nullptr) return -1;
     if (width != context->inputWidth || height != context->inputHeight || rowBytes < width * 4)
         return -1;
 
@@ -379,7 +378,7 @@ YS_EXPORT int YOLOSegSubmitRGBA(
         context->busy = true;
     }
 
-    auto pixelBuffer = CreatePixelBuffer(rgba, width, height, rowBytes);
+    auto pixelBuffer = CreatePixelBuffer(bgra, width, height, rowBytes);
     if (pixelBuffer == nullptr)
     {
         StoreError(context, "Could not allocate the Core Video input buffer.");

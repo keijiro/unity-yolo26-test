@@ -105,7 +105,7 @@ public sealed class SegDemoController : MonoBehaviour
 
         _cameraImage.scaleMode = ScaleMode.ScaleToFit;
         _segmentationImage.scaleMode = ScaleMode.ScaleToFit;
-        _cameraImage.image = _inputTexture != null ? _inputTexture : _webcam;
+        UpdateCameraImage();
         _segmentationImage.image = _segmentationTexture;
         SetStatus(_statusMessage);
     }
@@ -135,7 +135,7 @@ public sealed class SegDemoController : MonoBehaviour
 
         _webcam = new WebCamTexture(1280, 720, 30);
         _webcam.Play();
-        if (_cameraImage != null) _cameraImage.image = _webcam;
+        UpdateCameraImage();
     }
 
     void CompleteInitialization()
@@ -184,7 +184,7 @@ public sealed class SegDemoController : MonoBehaviour
             wrapMode = TextureWrapMode.Clamp
         };
         _inputTexture.Create();
-        if (_cameraImage != null) _cameraImage.image = _inputTexture;
+        UpdateCameraImage();
         SetStatus($"Ready · {_inputWidth} × {_inputHeight} input");
     }
 
@@ -204,7 +204,7 @@ public sealed class SegDemoController : MonoBehaviour
         Graphics.Blit(_webcam, _inputTexture, _preprocessMaterial);
 
         _readbackPending = true;
-        AsyncGPUReadback.Request(_inputTexture, 0, TextureFormat.RGBA32, OnReadback);
+        AsyncGPUReadback.Request(_inputTexture, 0, TextureFormat.BGRA32, OnReadback);
     }
 
     unsafe void OnReadback(AsyncGPUReadbackRequest request)
@@ -218,7 +218,7 @@ public sealed class SegDemoController : MonoBehaviour
 
         var source = request.GetData<byte>();
         var pointer = (IntPtr)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(source);
-        var result = YOLOSegNative.YOLOSegSubmitRGBA(
+        var result = YOLOSegNative.YOLOSegSubmitBGRA(
             _plugin,
             pointer,
             _inputWidth,
@@ -275,6 +275,14 @@ public sealed class SegDemoController : MonoBehaviour
             wrapMode = TextureWrapMode.Clamp
         };
         if (_segmentationImage != null) _segmentationImage.image = _segmentationTexture;
+    }
+
+    void UpdateCameraImage()
+    {
+        if (_cameraImage == null) return;
+        var preprocessed = _inputTexture != null;
+        _cameraImage.image = preprocessed ? _inputTexture : _webcam;
+        _cameraImage.uv = preprocessed ? new Rect(0, 1, 1, -1) : new Rect(0, 0, 1, 1);
     }
 
     void SetStatus(string message)
