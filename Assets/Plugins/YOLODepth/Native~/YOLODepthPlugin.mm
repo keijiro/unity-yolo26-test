@@ -76,7 +76,7 @@ CVPixelBufferRef CreatePixelBuffer(const uint8_t *rgba, int width, int height, i
     auto destinationRowBytes = CVPixelBufferGetBytesPerRow(buffer);
     for (auto y = 0; y < height; y++)
     {
-        auto sourceRow = rgba + y * rowBytes;
+        auto sourceRow = rgba + (height - 1 - y) * rowBytes;
         auto destinationRow = destination + y * destinationRowBytes;
         for (auto x = 0; x < width; x++)
         {
@@ -266,7 +266,7 @@ YD_EXPORT int YOLODepthSubmitRGBA(
             for (auto y = 0; y < outputHeight; y++)
                 for (auto x = 0; x < outputWidth; x++)
                     output[static_cast<size_t>(y * outputWidth + x)] =
-                        source[y * rowStride + x * columnStride];
+                        source[(outputHeight - 1 - y) * rowStride + x * columnStride];
 
             auto milliseconds = std::chrono::duration<double, std::milli>(end - start).count();
             std::lock_guard<std::mutex> lock(context->mutex);
