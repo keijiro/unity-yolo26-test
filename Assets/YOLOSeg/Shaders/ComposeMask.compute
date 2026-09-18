@@ -1,0 +1,56 @@
+#pragma kernel ComposeMask
+
+struct Detection
+{
+    // Must remain byte-for-byte compatible with the native/C# metadata record.
+    float4 bounds;
+    float4 coefficients[8];
+};
+
+Texture2D<float> _PrototypeTexture;
+StructuredBuffer<Detection> _Detections;
+RWTexture2D<float4> _OutputTexture;
+
+int _DetectionCount;
+int _OutputWidth;
+int _OutputHeight;
+
+[numthreads(8, 8, 1)]
+void ComposeMask(uint3 threadID : SV_DispatchThreadID)
+{
+    if (threadID.x >= _OutputWidth || threadID.y >= _OutputHeight) return;
+
+    int2 outputPixel = int2(threadID.xy);
+    // Preserve the orientation and cyan (0, alpha, alpha) encoding of the former
+    // CPU renderer so existing UI presentation remains unchanged.
+    int2 prototypePixel = int2(outputPixel.x, _OutputHeight - 1 - outputPixel.y);
+    float alpha = 0;
+
+    for (int detectionIndex = 0; detectionIndex < _DetectionCount; detectionIndex++)
+    {
+        Detection detection = _Detections[detectionIndex];
+        if (prototypePixel.x < detection.bounds.x ||
+            prototypePixel.y < detection.bounds.y ||
+            prototypePixel.x >= detection.bounds.z ||
+            prototypePixel.y >= detection.bounds.w)
+            continue;
+
+        float logit = 0;
+        for (int channel = 0; channel < 32; channel++)
+        {
+            int coefficientGroup = channel / 4;
+            int coefficientComponent = channel % 4;
+            float coefficient = detection.coefficients[coefficientGroup][coefficientComponent];
+            int prototypeY = channel * _OutputHeight + prototypePixel.y;
+            logit += coefficient * _PrototypeTexture.Load(
+                int3(prototypePixel.x, prototypeY, 0)
+            );
+        }
+
+        float probability = rcp(1 + exp(-logit));
+        // Keep the mask threshold in sync with the established CPU result.
+        if (probability >= 0.5) alpha = max(alpha, probability);
+    }
+
+    _OutputTexture[outputPixel] = float4(0, alpha, alpha, 1);
+}

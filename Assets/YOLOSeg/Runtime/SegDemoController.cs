@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
@@ -14,17 +16,37 @@ namespace YOLOSeg
 public sealed class SegDemoController : MonoBehaviour
 {
     [SerializeField, HideInInspector] Shader _preprocessShader = null;
+    [SerializeField, HideInInspector] ComputeShader _composeMaskShader = null;
+
+    readonly struct PrototypeLease
+    {
+        public int SlotIndex { get; }
+        public ulong Generation { get; }
+        public GraphicsFence Fence { get; }
+
+        public PrototypeLease(int slotIndex, ulong generation, GraphicsFence fence)
+        {
+            SlotIndex = slotIndex;
+            Generation = generation;
+            Fence = fence;
+        }
+    }
 
     IntPtr _plugin;
     Task<YOLOSegNative.CreationResult> _creationTask;
     WebCamTexture _webcam;
     RenderTexture _inputTexture;
-    Texture2D _segmentationTexture;
+    RenderTexture _segmentationTexture;
+    Texture2D[] _prototypeTextures;
+    GraphicsBuffer _detectionBuffer;
+    YOLOSegNative.DetectionMetadata[] _detectionMetadata;
+    readonly List<PrototypeLease> _prototypeLeases = new();
     Material _preprocessMaterial;
     bool _readbackPending;
     bool _disposed;
     int _inputWidth;
     int _inputHeight;
+    int _composeKernel = -1;
     int _uiVersion = -1;
     string _statusMessage;
 
@@ -47,11 +69,13 @@ public sealed class SegDemoController : MonoBehaviour
             "Models/yolo26n-seg.mlpackage"
         );
         SetStatus("Loading YOLO26 segmentation model…");
+        YOLOSegNative.EnsureLoaded();
         _creationTask = Task.Run(() => YOLOSegNative.Create(modelPath));
     }
 
     void Update()
     {
+        ReleaseCompletedPrototypeSlots();
         CompleteInitialization();
         if (_plugin == IntPtr.Zero) return;
 
@@ -70,10 +94,15 @@ public sealed class SegDemoController : MonoBehaviour
 
         if (_webcam != null) _webcam.Stop();
         _webcam = null;
+
+        if (_plugin != IntPtr.Zero) ReleaseAllPrototypeSlots();
         ReleaseTexture(ref _inputTexture);
-        Destroy(_segmentationTexture);
+        ReleaseTexture(ref _segmentationTexture);
+        DestroyPrototypeTextures();
+        _detectionBuffer?.Release();
+        _detectionBuffer = null;
+        _detectionMetadata = null;
         Destroy(_preprocessMaterial);
-        _segmentationTexture = null;
         _preprocessMaterial = null;
 
         if (_plugin != IntPtr.Zero)
@@ -168,6 +197,8 @@ public sealed class SegDemoController : MonoBehaviour
         if (_inputWidth <= 0 || _inputHeight <= 0)
         {
             SetStatus("The model reported an invalid input size.");
+            YOLOSegNative.YOLOSegDestroy(_plugin);
+            _plugin = IntPtr.Zero;
             return;
         }
 
@@ -184,8 +215,44 @@ public sealed class SegDemoController : MonoBehaviour
             wrapMode = TextureWrapMode.Clamp
         };
         _inputTexture.Create();
+        if (!CreatePrototypeTextures())
+        {
+            YOLOSegNative.YOLOSegDestroy(_plugin);
+            _plugin = IntPtr.Zero;
+            return;
+        }
+        if (!CreateComputeResources())
+        {
+            DestroyPrototypeTextures();
+            YOLOSegNative.YOLOSegDestroy(_plugin);
+            _plugin = IntPtr.Zero;
+            return;
+        }
         UpdateCameraImage();
-        SetStatus($"Ready · {_inputWidth} × {_inputHeight} input");
+        SetStatus(
+            $"Ready · {_inputWidth} × {_inputHeight} input · " +
+            $"{_prototypeTextures.Length} GPU prototype slots"
+        );
+    }
+
+    bool CreateComputeResources()
+    {
+        if (_composeMaskShader == null)
+        {
+            SetStatus("The mask composition compute shader is missing.");
+            return false;
+        }
+
+        _composeKernel = _composeMaskShader.FindKernel("ComposeMask");
+        _detectionMetadata = new YOLOSegNative.DetectionMetadata[
+            YOLOSegNative.DetectionLimit
+        ];
+        _detectionBuffer = new GraphicsBuffer(
+            GraphicsBuffer.Target.Structured,
+            YOLOSegNative.DetectionLimit,
+            Marshal.SizeOf<YOLOSegNative.DetectionMetadata>()
+        );
+        return true;
     }
 
     void ScheduleFrame()
@@ -228,7 +295,7 @@ public sealed class SegDemoController : MonoBehaviour
         if (result < 0) SetStatus("Could not submit the camera frame.");
     }
 
-    unsafe void ReceiveSegmentation()
+    void ReceiveSegmentation()
     {
         var result = YOLOSegNative.TryGetOutputInfo(
             _plugin,
@@ -236,6 +303,8 @@ public sealed class SegDemoController : MonoBehaviour
             out var height,
             out var personCount,
             out var milliseconds,
+            out var slotIndex,
+            out var generation,
             out var error
         );
         if (result < 0)
@@ -245,19 +314,155 @@ public sealed class SegDemoController : MonoBehaviour
         }
         if (result == 0) return;
 
-        EnsureOutputTexture(width, height);
-        var pixels = _segmentationTexture.GetRawTextureData<byte>();
-        var pointer = (IntPtr)NativeArrayUnsafeUtility.GetUnsafePtr(pixels);
-        if (YOLOSegNative.YOLOSegCopyOutput(_plugin, pointer, pixels.Length) != 1)
+        var gpuSubmitted = false;
+        try
         {
-            SetStatus("Could not copy the segmentation output.");
-            return;
+            EnsureOutputTexture(width, height);
+            if (!CopyDetectionMetadata(personCount))
+            {
+                SetStatus("Could not copy the detection metadata.");
+                return;
+            }
+
+            _detectionBuffer.SetData(_detectionMetadata);
+            _composeMaskShader.SetTexture(
+                _composeKernel,
+                "_PrototypeTexture",
+                _prototypeTextures[slotIndex]
+            );
+            _composeMaskShader.SetBuffer(_composeKernel, "_Detections", _detectionBuffer);
+            _composeMaskShader.SetTexture(_composeKernel, "_OutputTexture", _segmentationTexture);
+            _composeMaskShader.SetInt("_DetectionCount", personCount);
+            _composeMaskShader.SetInt("_OutputWidth", width);
+            _composeMaskShader.SetInt("_OutputHeight", height);
+            _composeMaskShader.Dispatch(
+                _composeKernel,
+                (width + 7) / 8,
+                (height + 7) / 8,
+                1
+            );
+            var fence = Graphics.CreateGraphicsFence(
+                GraphicsFenceType.CPUSynchronisation,
+                SynchronisationStageFlags.AllGPUOperations
+            );
+            // The external Texture2D aliases the native slot's IOSurface. Keep the
+            // slot leased until this dispatch has finished reading from it.
+            _prototypeLeases.Add(new PrototypeLease(slotIndex, generation, fence));
+            gpuSubmitted = true;
+            if (YOLOSegNative.YOLOSegMarkPrototypeSlotGPUInFlight(
+                    _plugin,
+                    slotIndex,
+                    generation
+                ) != 1)
+            {
+                SetStatus("Could not transfer the GPU prototype slot.");
+                return;
+            }
+            if (_segmentationImage != null) _segmentationImage.image = _segmentationTexture;
+            _segmentationImage?.MarkDirtyRepaint();
+            SetStatus($"{milliseconds:F1} ms · GPU slot {slotIndex}");
+        }
+        finally
+        {
+            if (!gpuSubmitted && slotIndex >= 0)
+                YOLOSegNative.YOLOSegReleasePrototypeSlot(_plugin, slotIndex, generation);
+        }
+    }
+
+    unsafe bool CopyDetectionMetadata(int personCount)
+    {
+        if (personCount < 0 || personCount > _detectionMetadata.Length) return false;
+        fixed (YOLOSegNative.DetectionMetadata *pointer = _detectionMetadata)
+        {
+            var byteCount = _detectionMetadata.Length *
+                            Marshal.SizeOf<YOLOSegNative.DetectionMetadata>();
+            return YOLOSegNative.YOLOSegCopyDetectionMetadata(
+                _plugin,
+                (IntPtr)pointer,
+                byteCount
+            ) == personCount;
+        }
+    }
+
+    bool CreatePrototypeTextures()
+    {
+        if (SystemInfo.graphicsDeviceType != GraphicsDeviceType.Metal)
+        {
+            SetStatus("The GPU prototype output requires the Metal graphics API.");
+            return false;
         }
 
-        _segmentationTexture.Apply(false, false);
-        if (_segmentationImage != null) _segmentationImage.image = _segmentationTexture;
-        _segmentationImage?.MarkDirtyRepaint();
-        SetStatus($"{milliseconds:F1} ms · {personCount} person(s)");
+        var count = YOLOSegNative.YOLOSegGetPrototypeSlotCount(_plugin);
+        if (count <= 0)
+        {
+            SetStatus("The native plugin did not provide GPU prototype slots.");
+            return false;
+        }
+
+        _prototypeTextures = new Texture2D[count];
+        for (var index = 0; index < count; index++)
+        {
+            var result = YOLOSegNative.YOLOSegGetPrototypeTextureInfo(
+                _plugin,
+                index,
+                out var width,
+                out var height,
+                out var pointer
+            );
+            if (result != 1 || width <= 0 || height <= 0 || pointer == IntPtr.Zero)
+            {
+                DestroyPrototypeTextures();
+                SetStatus($"Could not obtain GPU prototype slot {index}.");
+                return false;
+            }
+
+            _prototypeTextures[index] = Texture2D.CreateExternalTexture(
+                width,
+                height,
+                TextureFormat.RHalf,
+                false,
+                true,
+                pointer
+            );
+            _prototypeTextures[index].name = $"YOLO26 Prototype Slot {index}";
+            _prototypeTextures[index].filterMode = FilterMode.Point;
+            _prototypeTextures[index].wrapMode = TextureWrapMode.Clamp;
+        }
+        return true;
+    }
+
+    void DestroyPrototypeTextures()
+    {
+        if (_prototypeTextures == null) return;
+        foreach (var texture in _prototypeTextures) Destroy(texture);
+        _prototypeTextures = null;
+    }
+
+    void ReleaseCompletedPrototypeSlots()
+    {
+        if (_plugin == IntPtr.Zero) return;
+        for (var index = _prototypeLeases.Count - 1; index >= 0; index--)
+        {
+            var lease = _prototypeLeases[index];
+            if (!lease.Fence.passed) continue;
+            YOLOSegNative.YOLOSegReleasePrototypeSlot(
+                _plugin,
+                lease.SlotIndex,
+                lease.Generation
+            );
+            _prototypeLeases.RemoveAt(index);
+        }
+    }
+
+    void ReleaseAllPrototypeSlots()
+    {
+        foreach (var lease in _prototypeLeases)
+            YOLOSegNative.YOLOSegReleasePrototypeSlot(
+                _plugin,
+                lease.SlotIndex,
+                lease.Generation
+            );
+        _prototypeLeases.Clear();
     }
 
     void EnsureOutputTexture(int width, int height)
@@ -267,13 +472,21 @@ public sealed class SegDemoController : MonoBehaviour
             _segmentationTexture.height == height)
             return;
 
-        Destroy(_segmentationTexture);
-        _segmentationTexture = new Texture2D(width, height, TextureFormat.RGBA32, false, true)
+        ReleaseTexture(ref _segmentationTexture);
+        _segmentationTexture = new RenderTexture(
+            width,
+            height,
+            0,
+            RenderTextureFormat.ARGB32,
+            RenderTextureReadWrite.Linear
+        )
         {
             name = "YOLO26 Person Segmentation",
             filterMode = FilterMode.Bilinear,
-            wrapMode = TextureWrapMode.Clamp
+            wrapMode = TextureWrapMode.Clamp,
+            enableRandomWrite = true
         };
+        _segmentationTexture.Create();
         if (_segmentationImage != null) _segmentationImage.image = _segmentationTexture;
     }
 

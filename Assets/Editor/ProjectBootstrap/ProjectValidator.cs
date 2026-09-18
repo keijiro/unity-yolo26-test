@@ -17,6 +17,8 @@ public static class ProjectValidator
 {
     const string LibraryName = "YOLOSegPlugin";
     const int ErrorCapacity = 1024;
+    const int DetectionCapacity = 10;
+    const int DetectionStride = 36 * sizeof(float);
 
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
     static extern IntPtr YOLOSegCreate(
@@ -35,6 +37,18 @@ public static class ProjectValidator
     static extern int YOLOSegGetInputHeight(IntPtr handle);
 
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+    static extern int YOLOSegGetPrototypeSlotCount(IntPtr handle);
+
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+    static extern int YOLOSegGetPrototypeTextureInfo(
+        IntPtr handle,
+        int slotIndex,
+        out int width,
+        out int height,
+        out IntPtr nativeTexture
+    );
+
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
     static extern int YOLOSegSubmitBGRA(
         IntPtr handle,
         IntPtr bgra,
@@ -44,18 +58,38 @@ public static class ProjectValidator
     );
 
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
-    static extern int YOLOSegTryGetOutputInfo(
+    static extern int YOLOSegTryGetOutputInfoEx(
         IntPtr handle,
         out int width,
         out int height,
         out int personCount,
         out double inferenceMilliseconds,
+        out int slotIndex,
+        out ulong generation,
         StringBuilder errorBuffer,
         int errorCapacity
     );
 
     [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
-    static extern int YOLOSegCopyOutput(IntPtr handle, IntPtr destination, int capacity);
+    static extern int YOLOSegCopyDetectionMetadata(
+        IntPtr handle,
+        IntPtr destination,
+        int capacity
+    );
+
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+    static extern int YOLOSegMarkPrototypeSlotGPUInFlight(
+        IntPtr handle,
+        int slotIndex,
+        ulong generation
+    );
+
+    [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+    static extern int YOLOSegReleasePrototypeSlot(
+        IntPtr handle,
+        int slotIndex,
+        ulong generation
+    );
 
     public static void Validate()
     {
@@ -92,6 +126,11 @@ public static class ProjectValidator
         foreach (var message in ShaderUtil.GetShaderMessages(shader))
             if (message.severity == ShaderCompilerMessageSeverity.Error)
                 throw new InvalidOperationException($"{path}: {message.message}");
+
+        const string computePath = "Assets/YOLOSeg/Shaders/ComposeMask.compute";
+        var compute = AssetDatabase.LoadAssetAtPath<ComputeShader>(computePath);
+        if (compute == null)
+            throw new InvalidOperationException($"{computePath} could not be loaded.");
     }
 
     static void ValidateNativePlugin()
@@ -112,12 +151,32 @@ public static class ProjectValidator
             var height = YOLOSegGetInputHeight(handle);
             if (width != 640 || height != 640)
                 throw new InvalidOperationException($"Unexpected model input: {width} x {height}.");
+            ValidatePrototypeSlots(handle);
             Debug.Log($"[ProjectValidator] Core ML model loaded in {stopwatch.ElapsedMilliseconds} ms.");
             ValidateInference(handle, width, height);
         }
         finally
         {
             YOLOSegDestroy(handle);
+        }
+    }
+
+    static void ValidatePrototypeSlots(IntPtr handle)
+    {
+        var count = YOLOSegGetPrototypeSlotCount(handle);
+        if (count != 3)
+            throw new InvalidOperationException($"Unexpected prototype slot count: {count}.");
+        for (var index = 0; index < count; index++)
+        {
+            var result = YOLOSegGetPrototypeTextureInfo(
+                handle,
+                index,
+                out var width,
+                out var height,
+                out var texture
+            );
+            if (result != 1 || width != 160 || height != 5120 || texture == IntPtr.Zero)
+                throw new InvalidOperationException($"Prototype slot {index} is invalid.");
         }
     }
 
@@ -151,15 +210,19 @@ public static class ProjectValidator
         int outputHeight;
         int personCount;
         double milliseconds;
+        int slotIndex;
+        ulong generation;
         var error = new StringBuilder(ErrorCapacity);
         do
         {
-            result = YOLOSegTryGetOutputInfo(
+            result = YOLOSegTryGetOutputInfoEx(
                 handle,
                 out outputWidth,
                 out outputHeight,
                 out personCount,
                 out milliseconds,
+                out slotIndex,
+                out generation,
                 error,
                 error.Capacity
             );
@@ -172,24 +235,29 @@ public static class ProjectValidator
         if (outputWidth <= 0 || outputHeight <= 0)
             throw new InvalidOperationException("The segmentation output has an invalid size.");
 
-        var output = new byte[outputWidth * outputHeight * 4];
-        var outputPin = GCHandle.Alloc(output, GCHandleType.Pinned);
+        var metadata = new byte[DetectionCapacity * DetectionStride];
+        var metadataPin = GCHandle.Alloc(metadata, GCHandleType.Pinned);
         try
         {
-            if (YOLOSegCopyOutput(handle, outputPin.AddrOfPinnedObject(), output.Length) != 1)
-                throw new InvalidOperationException("The segmentation output could not be copied.");
+            if (YOLOSegCopyDetectionMetadata(
+                    handle,
+                    metadataPin.AddrOfPinnedObject(),
+                    metadata.Length
+                ) != personCount)
+                throw new InvalidOperationException("The detection metadata could not be copied.");
+            if (YOLOSegMarkPrototypeSlotGPUInFlight(handle, slotIndex, generation) != 1)
+                throw new InvalidOperationException("The prototype slot could not be transferred.");
         }
         finally
         {
-            outputPin.Free();
+            metadataPin.Free();
+            YOLOSegReleasePrototypeSlot(handle, slotIndex, generation);
         }
 
-        for (var index = 3; index < output.Length; index += 4)
-            if (output[index] != 255)
-                throw new InvalidOperationException("The segmentation output contains invalid pixels.");
         Debug.Log(
-            $"[ProjectValidator] Inference produced {outputWidth} x {outputHeight} segmentation " +
-            $"({personCount} person(s)) in {milliseconds:F1} ms."
+            $"[ProjectValidator] Inference produced GPU slot {slotIndex}, generation " +
+            $"{generation}, {outputWidth} x {outputHeight} ({personCount} person(s)) " +
+            $"in {milliseconds:F1} ms."
         );
     }
 }

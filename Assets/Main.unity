@@ -223,6 +223,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _preprocessShader: {fileID: 4800000, guid: a893605a8835f42bcb03057f06bf6899, type: 3}
+  _composeMaskShader: {fileID: 7200000, guid: 69fddaed66f41480ca95d154d761c193, type: 3}
 --- !u!1 &1411473415
 GameObject:
   m_ObjectHideFlags: 0

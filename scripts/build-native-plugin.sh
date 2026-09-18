@@ -7,6 +7,13 @@ source_file="$project_dir/Assets/Plugins/YOLOSeg/Native~/YOLOSegPlugin.mm"
 plist_file="$project_dir/Assets/Plugins/YOLOSeg/Native~/Info.plist"
 bundle_dir="$project_dir/Assets/Plugins/macOS/YOLOSegPlugin.bundle"
 binary_dir="$bundle_dir/Contents/MacOS"
+unity_version=$(sed -n 's/^m_EditorVersion: //p' "$project_dir/ProjectSettings/ProjectVersion.txt")
+plugin_api_dir="/Applications/Unity/Hub/Editor/$unity_version/Unity.app/Contents/Resources/PluginAPI"
+
+if [[ ! -f "$plugin_api_dir/IUnityGraphicsMetal.h" ]]; then
+    echo "Unity Metal plugin headers were not found at $plugin_api_dir" >&2
+    exit 1
+fi
 
 mkdir -p "$binary_dir"
 cp "$plist_file" "$bundle_dir/Contents/Info.plist"
@@ -19,9 +26,11 @@ xcrun --sdk macosx clang++ \
     -arch arm64 \
     -arch x86_64 \
     -mmacosx-version-min=12.0 \
+    -I "$plugin_api_dir" \
     -framework Foundation \
     -framework CoreML \
     -framework CoreVideo \
+    -framework Metal \
     "$source_file" \
     -o "$binary_dir/YOLOSegPlugin"
 
