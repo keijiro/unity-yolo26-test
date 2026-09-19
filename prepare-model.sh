@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-project_dir="${0:A:h:h}"
+project_dir="${0:A:h}"
 model_dir="$project_dir/Assets/StreamingAssets/Models"
 model_name="yolo26n-seg"
 destination="$model_dir/$model_name.mlpackage"

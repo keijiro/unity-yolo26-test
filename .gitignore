@@ -16,14 +16,6 @@ Desktop.ini
 /Xcode
 /Web
 
-# Downloadable model data
-/Assets/StreamingAssets/Models/*.mlpackage
-/Assets/StreamingAssets/Models/*.mlpackage.meta
-
-# Generated native plug-ins
-/Assets/Plugins/macOS/*.bundle
-/Assets/Plugins/macOS/*.bundle.meta
-
 /*.app
 /*.exe
 /*.apk

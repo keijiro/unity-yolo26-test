@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-project_dir="${0:A:h:h}"
+project_dir="${0:A:h}"
 native_dir="$project_dir/Plugin"
 source_files=(
     "$native_dir/YOLOSegPlugin.mm"
