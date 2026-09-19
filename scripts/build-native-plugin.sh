@@ -3,7 +3,7 @@
 set -euo pipefail
 
 project_dir="${0:A:h:h}"
-native_dir="$project_dir/Assets/Plugins/YOLOSeg/Native~"
+native_dir="$project_dir/Plugin"
 source_files=(
     "$native_dir/YOLOSegPlugin.mm"
     "$native_dir/YOLOSegContext.mm"
@@ -30,7 +30,7 @@ xcrun --sdk macosx clang++ \
     -bundle \
     -arch arm64 \
     -arch x86_64 \
-    -mmacosx-version-min=12.0 \
+    -mmacosx-version-min=13.0 \
     -I "$plugin_api_dir" \
     -framework Foundation \
     -framework CoreML \

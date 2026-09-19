@@ -6,16 +6,8 @@ project_dir="${0:A:h:h}"
 model_dir="$project_dir/Assets/StreamingAssets/Models"
 model_name="yolo26n-seg"
 destination="$model_dir/$model_name.mlpackage"
-sibling_model="$project_dir/../yolo26-coreml-test/Models/$model_name.mlpackage"
 
 mkdir -p "$model_dir"
-
-if [[ -d "$sibling_model" ]]; then
-    rm -rf "$destination"
-    cp -R "$sibling_model" "$destination"
-    echo "Installed model from $sibling_model"
-    exit 0
-fi
 
 if ! command -v uv >/dev/null; then
     echo "uv is required to download and export $model_name." >&2
@@ -29,8 +21,9 @@ cd "$work_dir"
 uv run --python 3.11 \
     --with ultralytics \
     --with coremltools \
+    --with scikit-learn \
     --with 'numpy<=2.3.5' \
-    yolo export model="$model_name.pt" format=coreml imgsz=640
+    yolo export model="$model_name.pt" format=coreml imgsz=640 quantize=8
 
 package=$(find "$work_dir" -maxdepth 2 -name "$model_name.mlpackage" -print -quit)
 if [[ -z "$package" ]]; then
